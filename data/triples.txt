@@ -1,0 +1,9 @@
+BASE	MORFOLOGICO	LESSICALE
+preciso	impreciso	approssimativo
+felice	infelice	triste
+abitato	disabitato	deserto
+corretto	scorretto	sbagliato
+prudente	imprudente	avventato
+razionale	irrazionale	istintivo
+rilevante	irrilevante	trascurabile
+sufficiente	insufficiente	scarso
