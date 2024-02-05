@@ -2,6 +2,7 @@ import numpy as np
 import collections
 import tqdm
 import csv
+import random
 from typing import List
 
 import src.utils as u
@@ -327,3 +328,149 @@ def add_logL_values(coppie_fname:str, gruppo2_fname:str, gruppo3_fname:str,
                     logl_lemma = sca[lemma]
 
                 print(f"gruppo3\t{lemma}\t{f_abs_lemma}\t{f_cxn_lemma}\t{logl_lemma}", file=fout)
+
+
+#TODO: finish here
+def extract_adj_contexts(corpus_filepaths: List[str],
+                        triples_filepath: str,
+                        output_folder:str,
+                        ctx_windows: int = 7) -> None:
+
+
+    adjs = set()
+    with open(triples_filepath, encoding="utf-8") as fin:
+        fin.readline()
+
+        for line in fin:
+            line = line.strip().split("\t")
+            w1, w2, w3 = line
+            adjs.add(w1)
+            adjs.add(w2)
+            adjs.add(w3)
+
+
+
+    files = {}
+    for adj in adjs:
+        files[adj] = open(f"{output_folder}/{adj}.txt", "w")
+
+    for filename in corpus_filepaths:
+        with open(filename, encoding="utf-8") as fin:
+
+            frase = []
+            id_candidates = []
+            i=0
+
+            for line in tqdm.tqdm(fin):
+
+                if not line.startswith("<"):
+                    line = line.strip().split("\t")
+
+                    frase.append(line)
+
+                    if line[3] == "A" and line[2] in adjs:
+                        id_candidates.append(i)
+
+                    i+=1
+
+                else:
+                    if len(frase) > 2*ctx_windows+1:
+
+                        for el in id_candidates:
+                            if el >= ctx_windows and el < len(frase)-ctx_windows:
+                                left_ctx = [l[2] for l in frase[el-ctx_windows:el]]
+                                right_ctx = [l[2] for l in frase[el+1:el+ctx_windows+1]]
+                                adj = frase[el][2]
+
+                                print(f"{' '.join(left_ctx)}\t{adj}\t{' '.join(right_ctx)}", file=files[adj])
+
+                    frase = []
+                    id_candidates = []
+                    i = 0
+
+
+def compute_TTR(triples_filepath:str,
+                input_files:List[str], number_of_sentences: int,
+                remove_punctuation:bool, output_folder:str,
+                random_seed: int = 5642):
+
+    random.seed(random_seed)
+
+    adjs = []
+    TTR_dict = {}
+    with open(triples_filepath, encoding="utf-8") as fin:
+        fin.readline()
+
+        for line in fin:
+            line = line.strip().split("\t")
+            adjs.append(line)
+
+            for el in line:
+                TTR_dict[el] = {"TTR":0,
+                              "len_types":0,
+                              "n_tokens": 0}
+
+
+
+
+
+    with open(f"{output_folder}/riepilogo.txt", "w", encoding="utf-8") as fout_riepilogo:
+        print("BASE\tTYPES\tTOKENS\tTTR\tMORFOLOGICO\tTYPES\tTOKENS\tTTR\tLESSICALE\tTYPES\tTOKENS\tTTR", file=fout_riepilogo)
+
+        for filename in input_files:
+            filename_suffix = filename.split("/")[-1]
+
+            adj = filename_suffix.split(".")[0]
+            with open(filename, encoding="utf-8") as fin:
+                content = fin.readlines()
+
+                sample = content
+                if len(content) > number_of_sentences:
+                    sample = random.sample(content, number_of_sentences)
+
+                with open(f"{output_folder}/{filename_suffix}", "w", encoding="utf-8") as fout:
+                    print("".join(sample), file=fout)
+
+                types = set()
+                n_tokens = 0
+
+                for sentence in sample:
+                    sentence = sentence.strip().split("\t")
+                    left_ctx, _, right_ctx = sentence
+
+                    left_ctx = left_ctx.split(" ")
+                    right_ctx = right_ctx.split(" ")
+
+                    if remove_punctuation:
+                        left_ctx = [x for x in left_ctx if not u.is_punctuation(x)]
+                        right_ctx = [x for x in right_ctx if not u.is_punctuation(x)]
+
+
+                    for tok in left_ctx:
+                        if all(x.isdigit() for x in tok):
+                            types.add("NUM")
+                        else:
+                            types.add(tok)
+                        n_tokens += 1
+
+                    for tok in right_ctx:
+                        if all(x.isdigit() for x in tok):
+                            types.add("NUM")
+                        else:
+                            types.add(tok)
+                        n_tokens += 1
+
+
+
+            TTR = 0
+            if n_tokens > 0:
+                TTR = len(types)/n_tokens
+            TTR_dict[adj] = {"TTR":TTR,
+                             "len_types":len(types),
+                             "n_tokens": n_tokens}
+
+        for tripla in adjs:
+            s = ""
+            for el in tripla:
+                s+= f"{el}\t{TTR_dict[el]['len_types']}\t{TTR_dict[el]['n_tokens']}\t{TTR_dict[el]['TTR']}\t"
+            print(s, file=fout_riepilogo)
