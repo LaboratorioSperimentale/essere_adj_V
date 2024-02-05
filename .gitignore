@@ -165,4 +165,3 @@ cython_debug/
 
 experiments.py
 extract_contexts.py
-output/

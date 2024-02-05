@@ -1,0 +1,9 @@
+BASE	F	MORFOLOGICO	F	LESSICALE	F
+preciso	35136	impreciso	1208	approssimativo	1957	
+felice	24139	infelice	3860	triste	10278	
+abitato	0	disabitato	480	deserto	4399	
+corretto	6652	scorretto	2198	sbagliato	12410	
+prudente	7352	imprudente	683	avventato	372	
+razionale	3757	irrazionale	1736	istintivo	1269	
+rilevante	10976	irrilevante	2127	trascurabile	2570	
+sufficiente	20933	insufficiente	6083	scarso	19100	
