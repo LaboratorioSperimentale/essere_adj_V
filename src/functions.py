@@ -1,5 +1,7 @@
+import numpy as np
 import collections
 import tqdm
+import csv
 from typing import List
 
 import src.utils as u
@@ -199,3 +201,129 @@ def build_input_sca (frequenze_adj_in: str,
                 overall_f = freqs_adj_generic[adj]
 
             print(f"{adj}\t{freqs_adj_in_cxn[adj]}\t{overall_f}", file=fout)
+
+
+def clean_pairs_outliers(coppie_fname:str,
+                         output_folder:str) -> None:
+
+    differences = {}
+    values = []
+
+    with open(coppie_fname, encoding="utf-8") as fin:
+        for line in fin:
+            linesplit = line.strip().split("\t")
+            antonimo, f_ant, base, f_base = linesplit
+            f_ant, f_base = int(f_ant), int(f_base)
+
+            differences[(antonimo, base)] = (f_ant, f_base, f_ant-f_base)
+            values.append(f_ant-f_base)
+
+
+    q1, q3 = np.quantile(values, [0.25, 0.75])
+    iqr = q3 - q1
+    upper_limit = q3 + 1.5*iqr
+    lower_limit = q1 - 1.5*iqr
+
+    print(f"Computed Q1: {q1}, Q3: {q3}, IQR: {iqr}")
+    print(f"Computer Upper Limit as Q3 + 1.5*IQR = {upper_limit}")
+    print(f"Computer Lower Limit as Q1 - 1.5*IQR = {lower_limit}")
+
+    with open(f"{output_folder}/fant_moltomaggiore_fbase.txt", "w", encoding="utf-8") as fout:
+        for x, y in differences.items():
+            if y[2] > upper_limit:
+                print(f"{x[0]}\t{y[0]}\t{x[1]}\t{y[1]}", file=fout)
+
+    with open(f"{output_folder}/fant_moltominore_fbase.txt", "w", encoding="utf-8") as fout:
+        for x, y in differences.items():
+            if y[2] < lower_limit:
+                print(f"{x[0]}\t{y[0]}\t{x[1]}\t{y[1]}", file=fout)
+
+    with open(f"{output_folder}/coppie_pulite.txt", "w", encoding="utf-8") as fout:
+        for x, y in differences.items():
+            if y[2] >= lower_limit and y[2] <= upper_limit:
+                print(f"{x[0]}\t{y[0]}\t{x[1]}\t{y[1]}", file=fout)
+
+
+def add_logL_values(coppie_fname:str, gruppo2_fname:str, gruppo3_fname:str,
+                    overall_frequenze_in:str, overall_frequenze_gen:str,
+                    cxn_frequenze_in:str, cxn_frequenze_gen:str,
+                    sca_fname:str,
+                    output_folder:str) -> None:
+
+    freqs_adj_in = u.load_frequency_dict(overall_frequenze_in)
+    freqs_adj_gen = u.load_frequency_dict(overall_frequenze_gen)
+
+    cxn_freqs_adj_in = u.load_frequency_dict(cxn_frequenze_in)
+    cxn_freqs_adj_gen = u.load_frequency_dict(cxn_frequenze_gen)
+
+    sca = {}
+
+    with open(sca_fname, encoding="utf-8") as csv_fin:
+        reader = csv.reader(csv_fin)
+        header = reader.__next__()
+
+        for line in reader:
+            d = dict(zip(header, line))
+
+            sca[d["COLLEX"]] = d["COLL.STR.LOGL"]
+
+
+    with open(f"{output_folder}/gruppi_LOGL.tsv", "w", encoding="utf-8") as fout:
+        print("TIPO\tLEMMA\tABS_FREQ\tFREQ_IN_CXN\tLOGL", file=fout)
+
+        with open(coppie_fname, encoding="utf-8") as fin:
+
+            for line in fin:
+                line = line.strip().split("\t")
+                antonimo, base = line[0], line[2]
+
+                f_abs_antonimo = freqs_adj_in[antonimo]
+                f_cxn_antonimo = 0
+                if antonimo in cxn_freqs_adj_in:
+                    f_cxn_antonimo = cxn_freqs_adj_in[antonimo]
+                logl_antonimo = 0
+                if antonimo in sca:
+                    logl_antonimo = sca[antonimo]
+
+                print(f"gruppo1\t{antonimo}\t{f_abs_antonimo}\t{f_cxn_antonimo}\t{logl_antonimo}", file=fout)
+
+
+                f_abs_base = freqs_adj_gen[base]
+                f_cxn_base = 0
+                if base in cxn_freqs_adj_gen:
+                    f_cxn_base = cxn_freqs_adj_gen[base]
+                logl_base = 0
+                if base in sca:
+                    logl_base = sca[base]
+
+                print(f"basi\t{base}\t{f_abs_base}\t{f_cxn_base}\t{logl_base}", file=fout)
+
+        with open(gruppo2_fname, encoding="utf-8") as fin:
+            for line in fin:
+                line = line.strip().split("\t")
+                lemma = line[0]
+
+                f_abs_lemma = freqs_adj_in[lemma]
+                f_cxn_lemma = 0
+                if lemma in cxn_freqs_adj_in:
+                    f_cxn_lemma = cxn_freqs_adj_in[lemma]
+                logl_lemma = 0
+                if lemma in sca:
+                    logl_lemma = sca[lemma]
+
+                print(f"gruppo2\t{lemma}\t{f_abs_lemma}\t{f_cxn_lemma}\t{logl_lemma}", file=fout)
+
+        with open(gruppo3_fname, encoding="utf-8") as fin:
+            for line in fin:
+                line = line.strip().split("\t")
+                lemma = line[0]
+
+                f_abs_lemma = freqs_adj_in[lemma]
+                f_cxn_lemma = 0
+                if lemma in cxn_freqs_adj_in:
+                    f_cxn_lemma = cxn_freqs_adj_in[lemma]
+                logl_lemma = 0
+                if lemma in sca:
+                    logl_lemma = sca[lemma]
+
+                print(f"gruppo3\t{lemma}\t{f_abs_lemma}\t{f_cxn_lemma}\t{logl_lemma}", file=fout)
